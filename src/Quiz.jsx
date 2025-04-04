@@ -7,22 +7,34 @@ const Quiz = () => {
   const [responses, setResponses] = useState([]);
   const [selectedOption, setSelectedOption] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState(null);
+  const [user, setUser] = useState(null);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes timer
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
   const [quizHidden, setQuizHidden] = useState(false);
+  const [disqualified, setDisqualified] = useState(false);
 
   useEffect(() => {
-    const fetchUserAndQuestions = async () => {
+    const initializeQuiz = async () => {
       try {
-        const user = pb.authStore.model;
-        if (user) {
-          setUserId(user.id);
-        } else {
+        const currentUser = pb.authStore.model;
+        if (!currentUser) {
           console.error("No user logged in");
           return;
         }
 
+        const player = await pb.collection("players").getOne(currentUser.id);
+        setUser(player);
+
+        // Disqualify if already attempted or moved
+        if (player.attempted || player.moved) {
+          setDisqualified(true);
+          return;
+        }
+
+        // First attempt — mark as attempted
+        await pb.collection("players").update(player.id, { attempted: true });
+
+        // Load questions
         const records = await pb.collection("questions").getFullList({
           page: 1,
           perPage: 500,
@@ -31,27 +43,51 @@ const Quiz = () => {
 
         setQuestions(records);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error initializing quiz:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUserAndQuestions();
+    initializeQuiz();
 
-    // Fetch quiz visibility status
+    // Fetch red/green light status
     const checkQuizVisibility = async () => {
-      const record = await pb.collection("quiz_control").getFirstListItem();
+      const record = await pb.collection("state").getFirstListItem();
       if (record) {
-        setQuizHidden(record.hidden);
+        setQuizHidden(!record.light); // light = true (Green), false (Red)
       }
     };
 
     checkQuizVisibility();
-    const interval = setInterval(checkQuizVisibility, 3000); // Check every 3 seconds
+    const interval = setInterval(checkQuizVisibility, 3000); // Poll every 3s
 
     return () => clearInterval(interval);
   }, []);
+
+  // ⛔ Detect cheating movement during Red Light
+  useEffect(() => {
+    if (!quizHidden || disqualified) return;
+
+    const handleCheating = async () => {
+      if (user) {
+        try {
+          await pb.collection("players").update(user.id, { moved: true });
+        } catch (err) {
+          console.error("Failed to update moved flag:", err);
+        }
+      }
+      setDisqualified(true);
+    };
+
+    window.addEventListener("mousemove", handleCheating);
+    window.addEventListener("keydown", handleCheating);
+
+    return () => {
+      window.removeEventListener("mousemove", handleCheating);
+      window.removeEventListener("keydown", handleCheating);
+    };
+  }, [quizHidden, user, disqualified]);
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -66,15 +102,13 @@ const Quiz = () => {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  if (loading) return <p>Loading questions...</p>;
-  if (questions.length === 0) return <p>No questions available.</p>;
-
   const currentQuestion = questions[currentQuestionIndex];
-  const options = Array.isArray(currentQuestion.options)
+  const options = Array.isArray(currentQuestion?.options)
     ? currentQuestion.options
-    : JSON.parse(currentQuestion.options || "[]");
+    : JSON.parse(currentQuestion?.options || "[]");
 
   const handleOptionSelect = (index) => {
+    if (quizHidden || disqualified) return;
     setSelectedOption(index);
   };
 
@@ -105,19 +139,22 @@ const Quiz = () => {
     saveResponse();
 
     try {
-      if (!userId) {
-        console.error("User not logged in");
+      if (!user) {
+        console.error("User not loaded");
         return;
       }
 
       await pb.collection("responses").create({
-        user_id: userId,
+        user_id: user.id,
         answers: responses,
         score: score,
         timestamp: new Date().toISOString(),
+        eliminated: disqualified,
       });
 
-      alert(`Quiz submitted! Your score: ${score}/${questions.length}`);
+      if (!disqualified) {
+        alert(`Quiz submitted! Your score: ${score}/${questions.length}`);
+      }
     } catch (error) {
       console.error("Error submitting quiz:", error);
     }
@@ -129,11 +166,25 @@ const Quiz = () => {
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  if (loading) return <p>Loading...</p>;
+
+  if (disqualified) {
+    return (
+      <div style={{ backgroundColor: "red", color: "white", padding: "2rem" }}>
+        <h1>Disqualified! ❌</h1>
+        <p>You have either already attempted the quiz or moved during Red Light.</p>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) return <p>No questions available.</p>;
+
   return (
     <div>
       <h2>Time Left: {formatTime(timeLeft)}</h2>
+
       {quizHidden ? (
-        <h2 style={{ color: "red" }}>Quiz is temporarily hidden by Admin</h2>
+        <h2 style={{ color: "red" }}>🛑 Red Light! Do NOT move!</h2>
       ) : (
         <>
           <h2>Question {currentQuestionIndex + 1}</h2>
@@ -149,6 +200,7 @@ const Quiz = () => {
                   padding: "10px",
                   margin: "5px",
                   border: "1px solid black",
+                  color: "white",
                 }}
               >
                 {option}
@@ -177,3 +229,4 @@ const Quiz = () => {
 };
 
 export default Quiz;
+
