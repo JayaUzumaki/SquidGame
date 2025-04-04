@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import pb from "./pocketbase"; // Ensure correct import of PocketBase instance
+import pb from "./pocketbase"; // PocketBase instance
 
 const Quiz = () => {
   const [questions, setQuestions] = useState([]);
@@ -9,7 +9,8 @@ const Quiz = () => {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes (600 seconds)
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes timer
+  const [quizHidden, setQuizHidden] = useState(false);
 
   useEffect(() => {
     const fetchUserAndQuestions = async () => {
@@ -37,11 +38,24 @@ const Quiz = () => {
     };
 
     fetchUserAndQuestions();
+
+    // Fetch quiz visibility status
+    const checkQuizVisibility = async () => {
+      const record = await pb.collection("quiz_control").getFirstListItem();
+      if (record) {
+        setQuizHidden(record.hidden);
+      }
+    };
+
+    checkQuizVisibility();
+    const interval = setInterval(checkQuizVisibility, 3000); // Check every 3 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (timeLeft <= 0) {
-      handleSubmitQuiz(); // Auto-submit when timer reaches 0
+      handleSubmitQuiz();
       return;
     }
 
@@ -49,7 +63,7 @@ const Quiz = () => {
       setTimeLeft((prevTime) => prevTime - 1);
     }, 1000);
 
-    return () => clearInterval(timer); // Cleanup on unmount
+    return () => clearInterval(timer);
   }, [timeLeft]);
 
   if (loading) return <p>Loading questions...</p>;
@@ -96,10 +110,6 @@ const Quiz = () => {
         return;
       }
 
-      if (responses.length !== questions.length) {
-        alert("Time's up! Submitting your quiz...");
-      }
-
       await pb.collection("responses").create({
         user_id: userId,
         answers: responses,
@@ -113,7 +123,6 @@ const Quiz = () => {
     }
   };
 
-  // Format time as MM:SS
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -123,33 +132,45 @@ const Quiz = () => {
   return (
     <div>
       <h2>Time Left: {formatTime(timeLeft)}</h2>
-      <h2>Question {currentQuestionIndex + 1}</h2>
-      <p>{currentQuestion.question}</p>
-      <ul>
-        {options.map((option, index) => (
-          <li
-            key={index}
-            onClick={() => handleOptionSelect(index)}
-            style={{
-              cursor: "pointer",
-              backgroundColor: selectedOption === index ? "gray" : "blue",
-              padding: "10px",
-              margin: "5px",
-              border: "1px solid black",
-            }}
-          >
-            {option}
-          </li>
-        ))}
-      </ul>
-      {currentQuestionIndex < questions.length - 1 ? (
-        <button onClick={handleNextQuestion} disabled={selectedOption === null}>
-          Next
-        </button>
+      {quizHidden ? (
+        <h2 style={{ color: "red" }}>Quiz is temporarily hidden by Admin</h2>
       ) : (
-        <button onClick={handleSubmitQuiz} disabled={selectedOption === null}>
-          Submit
-        </button>
+        <>
+          <h2>Question {currentQuestionIndex + 1}</h2>
+          <p>{currentQuestion.question}</p>
+          <ul>
+            {options.map((option, index) => (
+              <li
+                key={index}
+                onClick={() => handleOptionSelect(index)}
+                style={{
+                  cursor: "pointer",
+                  backgroundColor: selectedOption === index ? "gray" : "blue",
+                  padding: "10px",
+                  margin: "5px",
+                  border: "1px solid black",
+                }}
+              >
+                {option}
+              </li>
+            ))}
+          </ul>
+          {currentQuestionIndex < questions.length - 1 ? (
+            <button
+              onClick={handleNextQuestion}
+              disabled={selectedOption === null}
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmitQuiz}
+              disabled={selectedOption === null}
+            >
+              Submit
+            </button>
+          )}
+        </>
       )}
     </div>
   );

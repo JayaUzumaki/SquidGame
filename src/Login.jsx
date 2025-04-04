@@ -9,11 +9,23 @@ function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      await pb.collection("players").authWithPassword(email, password);
-      alert("Login successful!");
-      window.location.href = "/quiz"; // Redirect to the quiz page
+      // Authenticate user
+      const authData = await pb
+        .collection("players")
+        .authWithPassword(email, password);
+
+      // Get user role from auth data
+      const userRole = authData.record.role; // Assuming 'role' is stored in the 'players' collection
+
+      if (userRole === "player") {
+        window.location.href = "/quiz"; // Redirect to the quiz page
+      } else if (userRole === "admin") {
+        window.location.href = "/admin"; // Redirect to the admin panel
+      } else {
+        setError("Unauthorized role detected!");
+      }
     } catch (err) {
-      setError("Invalid email or password" + err);
+      setError("Invalid email or password. " + err.message);
     }
   };
 
