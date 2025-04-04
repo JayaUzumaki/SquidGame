@@ -172,7 +172,9 @@ const Quiz = () => {
     return (
       <div style={{ backgroundColor: "red", color: "white", padding: "2rem" }}>
         <h1>Disqualified! ❌</h1>
-        <p>You have either already attempted the quiz or moved during Red Light.</p>
+        <p>
+          You have either already attempted the quiz or moved during Red Light.
+        </p>
       </div>
     );
   }
@@ -180,28 +182,34 @@ const Quiz = () => {
   if (questions.length === 0) return <p>No questions available.</p>;
 
   return (
-    <div style={{
-      maxWidth: "600px",
-      margin: "0 auto",
-      padding: "2rem",
-      fontFamily: "Arial, sans-serif",
-      textAlign: "center",
-    }}>
-      <div style={{
-        marginBottom: "1rem",
-        fontSize: "1.2rem",
-        fontWeight: "bold"
-      }}>
+    <div
+      style={{
+        maxWidth: "600px",
+        margin: "0 auto",
+        padding: "2rem",
+        fontFamily: "Arial, sans-serif",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          marginBottom: "1rem",
+          fontSize: "1.2rem",
+          fontWeight: "bold",
+        }}
+      >
         ⏱ Time Left: {formatTime(timeLeft)}
       </div>
 
       {quizHidden ? (
-        <div style={{
-          backgroundColor: "red",
-          color: "white",
-          padding: "2rem",
-          borderRadius: "10px",
-        }}>
+        <div
+          style={{
+            backgroundColor: "red",
+            color: "white",
+            padding: "2rem",
+            borderRadius: "10px",
+          }}
+        >
           <h2>🛑 RED LIGHT</h2>
           <p>Do NOT move! You're being watched 👀</p>
         </div>
@@ -214,7 +222,9 @@ const Quiz = () => {
             {currentQuestion.question}
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          >
             {options.map((option, index) => (
               <button
                 key={index}
@@ -225,7 +235,8 @@ const Quiz = () => {
                   border: "none",
                   fontSize: "1rem",
                   cursor: "pointer",
-                  backgroundColor: selectedOption === index ? "#4a4a4a" : "#007bff",
+                  backgroundColor:
+                    selectedOption === index ? "#4a4a4a" : "#007bff",
                   color: "white",
                   transition: "all 0.2s",
                 }}
@@ -263,7 +274,7 @@ const Quiz = () => {
                   fontSize: "1rem",
                   borderRadius: "8px",
                   border: "none",
-                  backgroundColor: selectedOption === null ? "gray" : "#28a745",
+                  backgroundColor: selectedOption === null ? "grey" : "#28a745",
                   color: "white",
                   cursor: selectedOption === null ? "not-allowed" : "pointer",
                 }}
