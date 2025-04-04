@@ -25,16 +25,13 @@ const Quiz = () => {
         const player = await pb.collection("players").getOne(currentUser.id);
         setUser(player);
 
-        // Disqualify if already attempted or moved
         if (player.attempted || player.moved) {
           setDisqualified(true);
           return;
         }
 
-        // First attempt — mark as attempted
         await pb.collection("players").update(player.id, { attempted: true });
 
-        // Load questions
         const records = await pb.collection("questions").getFullList({
           page: 1,
           perPage: 500,
@@ -51,21 +48,19 @@ const Quiz = () => {
 
     initializeQuiz();
 
-    // Fetch red/green light status
     const checkQuizVisibility = async () => {
       const record = await pb.collection("state").getFirstListItem();
       if (record) {
-        setQuizHidden(!record.light); // light = true (Green), false (Red)
+        setQuizHidden(!record.light);
       }
     };
 
     checkQuizVisibility();
-    const interval = setInterval(checkQuizVisibility, 3000); // Poll every 3s
+    const interval = setInterval(checkQuizVisibility, 3000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // ⛔ Detect cheating movement during Red Light
   useEffect(() => {
     if (!quizHidden || disqualified) return;
 
@@ -152,6 +147,11 @@ const Quiz = () => {
         eliminated: disqualified,
       });
 
+      // ✅ Save score in players collection
+      await pb.collection("players").update(user.id, {
+        score: score,
+      });
+
       if (!disqualified) {
         alert(`Quiz submitted! Your score: ${score}/${questions.length}`);
       }
@@ -180,48 +180,98 @@ const Quiz = () => {
   if (questions.length === 0) return <p>No questions available.</p>;
 
   return (
-    <div>
-      <h2>Time Left: {formatTime(timeLeft)}</h2>
+    <div style={{
+      maxWidth: "600px",
+      margin: "0 auto",
+      padding: "2rem",
+      fontFamily: "Arial, sans-serif",
+      textAlign: "center",
+    }}>
+      <div style={{
+        marginBottom: "1rem",
+        fontSize: "1.2rem",
+        fontWeight: "bold"
+      }}>
+        ⏱ Time Left: {formatTime(timeLeft)}
+      </div>
 
       {quizHidden ? (
-        <h2 style={{ color: "red" }}>🛑 Red Light! Do NOT move!</h2>
+        <div style={{
+          backgroundColor: "red",
+          color: "white",
+          padding: "2rem",
+          borderRadius: "10px",
+        }}>
+          <h2>🛑 RED LIGHT</h2>
+          <p>Do NOT move! You're being watched 👀</p>
+        </div>
       ) : (
         <>
-          <h2>Question {currentQuestionIndex + 1}</h2>
-          <p>{currentQuestion.question}</p>
-          <ul>
+          <h2 style={{ marginBottom: "1rem" }}>
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </h2>
+          <p style={{ fontSize: "1.1rem", marginBottom: "2rem" }}>
+            {currentQuestion.question}
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {options.map((option, index) => (
-              <li
+              <button
                 key={index}
                 onClick={() => handleOptionSelect(index)}
                 style={{
+                  padding: "1rem",
+                  borderRadius: "10px",
+                  border: "none",
+                  fontSize: "1rem",
                   cursor: "pointer",
-                  backgroundColor: selectedOption === index ? "gray" : "blue",
-                  padding: "10px",
-                  margin: "5px",
-                  border: "1px solid black",
+                  backgroundColor: selectedOption === index ? "#4a4a4a" : "#007bff",
                   color: "white",
+                  transition: "all 0.2s",
                 }}
               >
                 {option}
-              </li>
+              </button>
             ))}
-          </ul>
-          {currentQuestionIndex < questions.length - 1 ? (
-            <button
-              onClick={handleNextQuestion}
-              disabled={selectedOption === null}
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmitQuiz}
-              disabled={selectedOption === null}
-            >
-              Submit
-            </button>
-          )}
+          </div>
+
+          <div style={{ marginTop: "2rem" }}>
+            {currentQuestionIndex < questions.length - 1 ? (
+              <button
+                onClick={handleNextQuestion}
+                disabled={selectedOption === null}
+                style={{
+                  marginTop: "1rem",
+                  padding: "0.8rem 2rem",
+                  fontSize: "1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  backgroundColor: selectedOption === null ? "gray" : "green",
+                  color: "white",
+                  cursor: selectedOption === null ? "not-allowed" : "pointer",
+                }}
+              >
+                Next ➡️
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={selectedOption === null}
+                style={{
+                  marginTop: "1rem",
+                  padding: "0.8rem 2rem",
+                  fontSize: "1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  backgroundColor: selectedOption === null ? "gray" : "#28a745",
+                  color: "white",
+                  cursor: selectedOption === null ? "not-allowed" : "pointer",
+                }}
+              >
+                ✅ Submit
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -229,4 +279,3 @@ const Quiz = () => {
 };
 
 export default Quiz;
-
